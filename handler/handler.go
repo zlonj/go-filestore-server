@@ -51,10 +51,11 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		 newFile.Seek(0, 0)
-		 fileMeta.FileSha1 = util.FileSha1(newFile)
-		 meta.UpdateFileMeta(fileMeta)
+		newFile.Seek(0, 0)
+		fileMeta.FileSha1 = util.FileSha1(newFile)
+		meta.UpdateFileMeta(fileMeta)
 
+		fmt.Printf("File uploaded with hash: %s", fileMeta.FileSha1)
 		http.Redirect(w, r, "/file/upload/success", http.StatusFound)
 	}
 }
@@ -88,5 +89,29 @@ func FileQueryHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.Write(data)
+}
+
+func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	fileHash := r.Form.Get("filehash")
+	fileMeta := meta.GetFileMeta(fileHash)
+
+	file, err := os.Open(fileMeta.Location)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octect-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileMeta.FileName+"\"")
 	w.Write(data)
 }

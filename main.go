@@ -17,6 +17,7 @@ func main() {
 	http.HandleFunc("/file/upload/success", handler.UploadSuccessHandler)
 	http.HandleFunc("/file/meta", handler.GetFileMetadataHandler)
 	http.HandleFunc("/file/query", handler.FileQueryHandler)
+	http.HandleFunc("/file/download", handler.DownloadFileHandler)
 
 	// Port listening
 	fmt.Println("Starting server on port: 8080...")
