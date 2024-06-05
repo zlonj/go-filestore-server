@@ -1,6 +1,9 @@
 package meta
 
-import "sort"
+import (
+	"sort"
+	mydb "filestore-server/db"
+)
 
 // Metadata for files
 type FileMeta struct {
@@ -25,6 +28,27 @@ func UpdateFileMeta(fmeta FileMeta) {
 // Get file metadata by file's hash value
 func GetFileMeta(fileSha1 string) FileMeta {
 	return fileMetas[fileSha1]
+}
+
+// Add/update file metadata to mysql DB
+func UpdateFileMetadataDB(fileMeta FileMeta) bool {
+	return mydb.OnFileUploadFinished(
+		fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize, fileMeta.Location)
+}
+
+// Get file metadata from DB
+func GetFileMetadataDB(fileHash string) (FileMeta, error) {
+	tableFile, err := mydb.GetFileMeta(fileHash)
+	if err != nil {
+		return FileMeta{}, err
+	}
+	fileMeta := FileMeta{
+		FileSha1: tableFile.FileHash,
+		FileName: tableFile.FileName.String,
+		FileSize: tableFile.FileSize.Int64,
+		Location: tableFile.FileAddr.String,
+	}
+	return fileMeta, nil
 }
 
 // Get last `count` file metadata by upload time
