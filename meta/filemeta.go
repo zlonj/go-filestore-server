@@ -39,5 +39,9 @@ func GetLastFileMetas(count int) []FileMeta {
 		return fileMetaArray
 	}
 	return fileMetaArray[0:count]
+}
 
+// Delete a file metadata
+func RemoveFileMeta(fileHash string) {
+	delete(fileMetas, fileHash)
 }

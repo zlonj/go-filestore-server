@@ -115,3 +115,53 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileMeta.FileName+"\"")
 	w.Write(data)
 }
+
+func FileMetadataUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	operationType := r.Form.Get("op")
+	fileHash := r.Form.Get("filehash")
+	newFileName := r.Form.Get("filename")
+
+	if operationType != "0" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Rename and update file metadata
+	fileMeta := meta.GetFileMeta(fileHash)
+	fileMeta.FileName = newFileName
+	meta.UpdateFileMeta(fileMeta)
+
+	data, err := json.Marshal(fileMeta)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+// Deletes a file by file hash
+func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	fileHash := r.Form.Get("filehash")
+
+	// Remove file from file system
+	fileMeta := meta.GetFileMeta(fileHash)
+	err := os.Remove(fileMeta.Location)
+	if err != nil {
+		fmt.Printf("Failed to delete file %s at location %s\n", fileMeta.FileName, fileMeta.Location)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	meta.RemoveFileMeta(fileHash)
+	w.WriteHeader(http.StatusOK)
+}

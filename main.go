@@ -18,6 +18,9 @@ func main() {
 	http.HandleFunc("/file/meta", handler.GetFileMetadataHandler)
 	http.HandleFunc("/file/query", handler.FileQueryHandler)
 	http.HandleFunc("/file/download", handler.DownloadFileHandler)
+	http.HandleFunc("/file/update", handler.FileMetadataUpdateHandler)
+	http.HandleFunc("/file/delete", handler.FileDeleteHandler)
+	
 
 	// Port listening
 	fmt.Println("Starting server on port: 8080...")
