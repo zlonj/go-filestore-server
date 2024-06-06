@@ -23,6 +23,7 @@ func main() {
 
 	http.HandleFunc("/user/signup", handler.SignupHandler)
 	http.HandleFunc("/user/signin", handler.SigninHandler)
+	http.HandleFunc("/user/info", handler.HTTPInterceptor(handler.UserInfoHandler))
 	
 
 	// Port listening

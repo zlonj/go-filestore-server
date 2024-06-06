@@ -91,6 +91,29 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp.JSONBytes())
 }
 
+func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Parse request params
+	r.ParseForm()
+	username := r.Form.Get("username")
+
+	// 2. Verify token (logic moved to auth:HTTPInterceptor)
+
+	// 3. Get user information
+	user, err := dblayer.GetUserInfo(username)
+	if err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	// 4. Construct response body
+	response := util.RespMsg{
+		Code: 0,
+		Msg: "OK",
+		Data: user,
+	}
+	w.Write(response.JSONBytes())
+}
+
 func GenerateToken(username string) string {
 	// 40 bites token: md5(username + timestamp + token_salt) + timestamp[:8]
 	timestamp := fmt.Sprintf("%x", time.Now().Unix())
@@ -98,3 +121,9 @@ func GenerateToken(username string) string {
 	return tokenPrefix + timestamp[:8]
 }
 
+func IsTokenValid(token string) bool {
+	if len(token) != 40 {
+		return false
+	}
+	return true
+}
