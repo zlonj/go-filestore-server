@@ -27,7 +27,7 @@ CREATE TABLE `table_user` (
   `profile` text COMMENT 'profile',
   `status` int(11) NOT NULL DEFAULT '0' COMMENT 'account status(active/disabled/locked/deleted)',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_phone` (`phone`),
+  UNIQUE KEY `idx_username` (`user_name`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4;
 

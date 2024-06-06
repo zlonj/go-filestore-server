@@ -41,7 +41,7 @@ type TableFile struct {
 // Get metadata from mysql db
 func GetFileMeta(filehash string) (*TableFile, error) {
 	stmt, err := mydb.DBConn().Prepare("SELECT file_sha1, file_addr, file_name, file_size FROM table_file " +
-	"WHERE file_sha1 = ? AND status = 1 LIMIT 1")
+		"WHERE file_sha1 = ? AND status = 1 LIMIT 1")
 	if err != nil {
 		fmt.Println(err.Error())
 		return nil, err

@@ -20,6 +20,9 @@ func main() {
 	http.HandleFunc("/file/download", handler.DownloadFileHandler)
 	http.HandleFunc("/file/update", handler.FileMetadataUpdateHandler)
 	http.HandleFunc("/file/delete", handler.FileDeleteHandler)
+
+	http.HandleFunc("/user/signup", handler.SignupHandler)
+	http.HandleFunc("/user/signin", handler.SigninHandler)
 	
 
 	// Port listening

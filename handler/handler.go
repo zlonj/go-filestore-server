@@ -15,7 +15,7 @@ import (
 
 // Handles file upload
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
+	if r.Method == http.MethodGet {
 		// Return upload html page
 		data, err := ioutil.ReadFile("./static/view/index.html")
 		if err != nil {
@@ -23,7 +23,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		io.WriteString(w, string(data))
-	} else if r.Method == "POST" {
+	} else if r.Method == http.MethodPost {
 		// Accept file stream and save to local directory
 		file, head, err := r.FormFile("file")
 		if err != nil {
