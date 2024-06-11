@@ -13,14 +13,17 @@ func main() {
 			http.FileServer(http.Dir("./static"))))
 
 	// Route configuration
-	http.HandleFunc("/file/upload", handler.UploadHandler)
-	http.HandleFunc("/file/upload/success", handler.UploadSuccessHandler)
-	http.HandleFunc("/file/meta", handler.GetFileMetadataHandler)
-	http.HandleFunc("/file/query", handler.FileQueryHandler)
-	http.HandleFunc("/file/download", handler.DownloadFileHandler)
-	http.HandleFunc("/file/update", handler.FileMetadataUpdateHandler)
-	http.HandleFunc("/file/delete", handler.FileDeleteHandler)
+	// File oprations
+	http.HandleFunc("/file/upload", handler.HTTPInterceptor(handler.UploadHandler))
+	http.HandleFunc("/file/upload/success", handler.HTTPInterceptor(handler.UploadSuccessHandler))
+	http.HandleFunc("/file/meta", handler.HTTPInterceptor(handler.GetFileMetadataHandler))
+	http.HandleFunc("/file/query", handler.HTTPInterceptor(handler.FileQueryHandler))
+	http.HandleFunc("/file/download", handler.HTTPInterceptor(handler.DownloadFileHandler))
+	http.HandleFunc("/file/update", handler.HTTPInterceptor(handler.FileMetadataUpdateHandler))
+	http.HandleFunc("/file/delete", handler.HTTPInterceptor(handler.FileDeleteHandler))
+	http.HandleFunc("/file/fastupload", handler.HTTPInterceptor(handler.TryFastUploadHandler))
 
+	// User operations
 	http.HandleFunc("/user/signup", handler.SignupHandler)
 	http.HandleFunc("/user/signin", handler.SigninHandler)
 	http.HandleFunc("/user/info", handler.HTTPInterceptor(handler.UserInfoHandler))

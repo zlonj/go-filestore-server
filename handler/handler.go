@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	dblayer "filestore-server/db"
 	"filestore-server/meta"
 	"filestore-server/util"
 	"fmt"
@@ -55,8 +56,17 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		fileMeta.FileSha1 = util.FileSha1(newFile)
 		_ = meta.UpdateFileMetadataDB(fileMeta)
 
-		fmt.Printf("File uploaded with hash: %s", fileMeta.FileSha1)
-		http.Redirect(w, r, "/file/upload/success", http.StatusFound)
+		// TODO: Update user file table
+		r.ParseForm()
+		username := r.Form.Get("username")
+		suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
+		if suc {
+			fmt.Printf("File uploaded with hash: %s", fileMeta.FileSha1)
+			http.Redirect(w, r, "/file/upload/success", http.StatusFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Upload Failed."))
+		}
 	}
 }
 
@@ -88,8 +98,13 @@ func FileQueryHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	limitCount, _ := strconv.Atoi(r.Form.Get("limit"))
-	fileMetas := meta.GetLastFileMetas(limitCount)
-	data, err := json.Marshal(fileMetas)
+	username := r.Form.Get("username")
+	userFiles, err := dblayer.QueryUserFileMetas(username, limitCount)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(userFiles)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -169,4 +184,48 @@ func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	meta.RemoveFileMeta(fileHash)
 	w.WriteHeader(http.StatusOK)
+}
+
+func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	// 1. Parse request params
+	username := r.Form.Get("username")
+	filehash := r.Form.Get("filehash")
+	filename := r.Form.Get("filename")
+	filesize, _ := strconv.Atoi(r.Form.Get("filesize"))
+
+	// 2. Look up file hash from table_file
+	fileMeta, err := meta.GetFileMetadataDB(filehash)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// 3. If no record, return failure
+	if fileMeta.FileSha1 == "" {
+		resp := util.RespMsg{
+			Code: -1,
+			Msg: "Fast upload failed, call normal upload API",
+		}
+		w.Write(resp.JSONBytes())
+		return
+	}
+
+	// 4. Otherwise, insert user file record into table user file
+	suc := dblayer.OnUserFileUploadFinished(username, filehash, filename, int64(filesize))
+	if suc {
+		resp := util.RespMsg{
+			Code: 0,
+			Msg: "Fast upload successful",
+		}
+		w.Write(resp.JSONBytes())
+		return
+	}
+
+	resp := util.RespMsg{
+		Code: -2,
+		Msg: "Fast upload failed, please retry later",
+	}
+	w.Write(resp.JSONBytes())
 }

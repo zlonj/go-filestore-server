@@ -39,7 +39,7 @@ func UpdateFileMetadataDB(fileMeta FileMeta) bool {
 // Get file metadata from DB
 func GetFileMetadataDB(fileHash string) (FileMeta, error) {
 	tableFile, err := mydb.GetFileMeta(fileHash)
-	if err != nil {
+	if err != nil || tableFile == nil {
 		return FileMeta{}, err
 	}
 	fileMeta := FileMeta{

@@ -122,8 +122,5 @@ func GenerateToken(username string) string {
 }
 
 func IsTokenValid(token string) bool {
-	if len(token) != 40 {
-		return false
-	}
-	return true
+	return len(token) == 40
 }
