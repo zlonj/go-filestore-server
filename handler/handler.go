@@ -77,7 +77,6 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		// Update/insert file metadata record into mysql
 		_ = meta.UpdateFileMetadataDB(fileMeta)
 
-		// TODO: Update user file table
 		r.ParseForm()
 		username := r.Form.Get("username")
 		suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
