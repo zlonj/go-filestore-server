@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"filestore-server/config"
 	dblayer "filestore-server/db"
 	"filestore-server/meta"
+	appS3 "filestore-server/store/s3"
 	"filestore-server/util"
 	"fmt"
 	"io"
@@ -12,6 +15,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // Handles file upload
@@ -54,6 +59,22 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
+
+		// Store file to S3
+		s3Bucket := config.S3_BUCKET
+		s3Key := fileMeta.FileSha1
+		_, err = appS3.Client().PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket: &s3Bucket,
+			Key: &s3Key,
+		})
+		if err != nil {
+			fmt.Println("Upload S3 err: " + err.Error())
+			w.Write([]byte("Upload failed"))
+			return
+		}
+		fileMeta.Location = s3Key
+
+		// Update/insert file metadata record into mysql
 		_ = meta.UpdateFileMetadataDB(fileMeta)
 
 		// TODO: Update user file table
@@ -118,14 +139,21 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	fileHash := r.Form.Get("filehash")
 	fileMeta := meta.GetFileMeta(fileHash)
 
-	file, err := os.Open(fileMeta.Location)
+	// Retrieve object from S3
+	s3Bucket := config.S3_BUCKET
+	s3Key := fileMeta.FileSha1
+	resp, err := appS3.Client().GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: &s3Bucket,
+		Key: &s3Key,
+	})
 	if err != nil {
+		fmt.Println("Failed to get S3 object, err: " + err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to download file"))
 		return
 	}
-	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
