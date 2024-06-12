@@ -23,6 +23,7 @@ type MultipartUploadInfo struct {
 	UploadID string
 	ChunkSize int
 	ChunkCount int
+	ChunkExists []int
 }
 
 const (
@@ -59,21 +60,60 @@ func InitialMultipartUploadHandler(w http.ResponseWriter, r *http.Request) {
 	redisConn := redisPool.RedisPool().Get()
 	defer redisConn.Close()
 
-	// 3. Initialize multipart upload information
+	// 3. Check if any parts are already uploaded
+	uploadID := ""
+	keyExists, _ := redis.Bool(redisConn.Do("EXISTS", HashUpIDKeyPrefix + filehash))
+	if keyExists {
+		uploadID, err = redis.String(redisConn.Do("GET", HashUpIDKeyPrefix + filehash))
+		if err != nil {
+			w.Write(util.NewRespMsg(-1, "Upload part failed", err.Error()).JSONBytes())
+			return
+		}
+	}
+
+	// 4.1 First upload: create new uploadID
+	// 4.2 If continue to upload, get chunks already uploaded with uploadID
+	chunksExist := []int{}
+
+	if uploadID != "" {
+		uploadID = username + fmt.Sprintf("%x", time.Now().UnixNano())
+	} else {
+		chunks, err := redis.Values(redisConn.Do("HGETALL", ChunkKeyPrefix + uploadID))
+		if err != nil {
+			w.Write(util.NewRespMsg(-1, "Upload part failed", err.Error()).JSONBytes())
+			return
+		}
+		for i := 0; i < len(chunks); i += 2 {
+			key := string(chunks[i].([]byte))
+			val := string(chunks[i + 1].([]byte))
+			if strings.HasPrefix(key, "chkidx_") && val == "1" {
+				chunkIdx, _ := strconv.Atoi(key[7:])
+				chunksExist = append(chunksExist, chunkIdx)
+			}
+		}
+	}
+
+	// 5. Initialize multipart upload information
 	upInfo := MultipartUploadInfo{
 		FileHash: filehash,
 		FileSize: filesize,
-		UploadID: username + fmt.Sprintf("%x", time.Now().UnixNano()),
+		UploadID: uploadID,
 		ChunkSize: 5 * 1024 * 1024,
 		ChunkCount: int(math.Ceil(float64(filesize) / (5 * 1024 * 1024))),
+		ChunkExists: chunksExist,
 	}
 
-	// 4. Write multipart information into redis
-	redisConn.Do("HSET", "MP_" + upInfo.UploadID, "chunkcount", upInfo.ChunkCount)
-	redisConn.Do("HSET", "MP_" + upInfo.UploadID, "filehash", upInfo.FileHash)
-	redisConn.Do("HSET", "MP_" + upInfo.UploadID, "filesize", upInfo.FileSize)
+	// 6. Write multipart information into redis
+	if len(upInfo.ChunkExists) <= 0 {
+		hkey := "MP_" + upInfo.UploadID
+		redisConn.Do("HSET", hkey, "chunkcount", upInfo.ChunkCount)
+		redisConn.Do("HSET", hkey, "filehash", upInfo.FileHash)
+		redisConn.Do("HSET", hkey, "filesize", upInfo.FileSize)
+		redisConn.Do("EXPIRE", hkey, 43200)
+		redisConn.Do("SET", HashUpIDKeyPrefix + filehash, upInfo.UploadID, "EX", 43200)
+	}
 
-	// 5. Return response back to client
+	// 7. Return response back to client
 	w.Write(util.NewRespMsg(0, "OK", upInfo).JSONBytes())
 }
 
