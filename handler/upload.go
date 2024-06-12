@@ -61,11 +61,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
 
-		// Store file to S3
-		// s3Bucket := config.S3_BUCKET
-		s3Key := fileMeta.FileSha1
-
 		// Send message to RabbitMQ to transfer file to S3
+		s3Key := fileMeta.FileSha1
 		data := mq.TransferData{
 			FileHash:     fileMeta.FileSha1,
 			CurrLocation: fileMeta.Location,
