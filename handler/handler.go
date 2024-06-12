@@ -141,7 +141,7 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve object from S3
 	s3Bucket := config.S3_BUCKET
-	s3Key := fileMeta.FileSha1
+	s3Key := fileMeta.Location
 	resp, err := appS3.Client().GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &s3Bucket,
 		Key: &s3Key,
