@@ -6,6 +6,7 @@ import (
 	"filestore-server/config"
 	dblayer "filestore-server/db"
 	"filestore-server/meta"
+	"filestore-server/mq"
 	appS3 "filestore-server/store/s3"
 	"filestore-server/util"
 	"fmt"
@@ -61,25 +62,30 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		fileMeta.FileSha1 = util.FileSha1(newFile)
 
 		// Store file to S3
-		s3Bucket := config.S3_BUCKET
+		// s3Bucket := config.S3_BUCKET
 		s3Key := fileMeta.FileSha1
-		_, err = appS3.Client().PutObject(context.TODO(), &s3.PutObjectInput{
-			Bucket: &s3Bucket,
-			Key: &s3Key,
-		})
-		if err != nil {
-			fmt.Println("Upload S3 err: " + err.Error())
-			w.Write([]byte("Upload failed"))
-			return
+
+		// Send message to RabbitMQ to transfer file to S3
+		data := mq.TransferData{
+			FileHash:     fileMeta.FileSha1,
+			CurrLocation: fileMeta.Location,
+			DestLocation: s3Key,
 		}
-		fileMeta.Location = s3Key
+		pubData, _ := json.Marshal(data)
+		suc := mq.Publish(config.TransExchangeName, config.TransS3RoutingKey, pubData)
+		if suc {
+			fileMeta.Location = s3Key
+		} else {
+				// TODO: Retry sending the message later
+				fmt.Println("Retry sending the failed message")
+		}
 
 		// Update/insert file metadata record into mysql
 		_ = meta.UpdateFileMetadataDB(fileMeta)
 
 		r.ParseForm()
 		username := r.Form.Get("username")
-		suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
+		suc = dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
 		if suc {
 			fmt.Printf("File uploaded with hash: %s", fileMeta.FileSha1)
 			http.Redirect(w, r, "/file/upload/success", http.StatusFound)
@@ -143,7 +149,7 @@ func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	s3Key := fileMeta.Location
 	resp, err := appS3.Client().GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: &s3Bucket,
-		Key: &s3Key,
+		Key:    &s3Key,
 	})
 	if err != nil {
 		fmt.Println("Failed to get S3 object, err: " + err.Error())
@@ -233,7 +239,7 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 	if fileMeta.FileSha1 == "" {
 		resp := util.RespMsg{
 			Code: -1,
-			Msg: "Fast upload failed, call normal upload API",
+			Msg:  "Fast upload failed, call normal upload API",
 		}
 		w.Write(resp.JSONBytes())
 		return
@@ -244,7 +250,7 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 	if suc {
 		resp := util.RespMsg{
 			Code: 0,
-			Msg: "Fast upload successful",
+			Msg:  "Fast upload successful",
 		}
 		w.Write(resp.JSONBytes())
 		return
@@ -252,7 +258,7 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp := util.RespMsg{
 		Code: -2,
-		Msg: "Fast upload failed, please retry later",
+		Msg:  "Fast upload failed, please retry later",
 	}
 	w.Write(resp.JSONBytes())
 }
